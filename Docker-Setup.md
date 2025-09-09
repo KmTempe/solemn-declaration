@@ -1,6 +1,6 @@
 # Docker Setup Guide
 
-Complete guide for deploying the Solemn Declaration Form System using Docker in production environments.
+Complete guide for deploying the Solemn Declaration Form System using Docker for both development and production environments.
 
 ## 📋 Prerequisites
 
@@ -17,24 +17,83 @@ docker --version
 docker-compose --version
 ```
 
-## 🚀 Quick Deployment (Production)
+## 🚀 Docker Image Information
 
-### 1. Environment Configuration
+### Production Image
+The application is published on Docker Hub as:
+- **Repository**: `kmtempe/solemn-declaration`
+- **Tags**: 
+  - `latest` - Always points to the most recent version
+  - `v2.0.4` - Specific version tag
+- **Base Image**: `python:3.12-alpine3.20` (latest secure Alpine)
+- **Size**: ~907MB (optimized with multi-stage build)
+- **Security**: Non-root user, minimal dependencies, health checks
 
-Copy the environment template and configure for production:
+### Pull the Image
+```bash
+# Pull latest version
+docker pull kmtempe/solemn-declaration:latest
 
+# Pull specific version
+docker pull kmtempe/solemn-declaration:v2.0.4
+```
+
+## 🔧 Development vs Production
+
+This project provides two deployment configurations:
+
+### Development Environment (`docker-compose.dev.yml`)
+- **Purpose**: Local development with hot reload
+- **Image**: Builds locally from Dockerfile
+- **Features**: 
+  - Source code mounted for live changes
+  - Development environment variables
+  - Debug mode enabled
+- **Usage**: `.\deploy-dev.ps1`
+
+### Production Environment (`docker-compose.prod.yml`)
+- **Purpose**: Production deployment with pre-built images
+- **Image**: Pulls from Docker Hub (`kmtempe/solemn-declaration:latest`)
+- **Features**: 
+  - Optimized for performance
+  - Production environment variables
+  - No source code mounting
+- **Usage**: `.\deploy-prod.ps1`
+
+## 🚀 Quick Deployment
+
+### Development Deployment
+
+1. **Environment Configuration**
 ```bash
 # Copy template
 copy .env.production.template .env.production
 
 # Edit with your settings (Windows)
 notepad .env.production
-
-# Edit with your settings (Linux/Mac)
-nano .env.production
 ```
 
-### 2. Setup Data Directories
+2. **Deploy Development Environment**
+```powershell
+# Windows PowerShell
+.\deploy-dev.ps1
+
+# Or manually
+docker-compose -f docker-compose.dev.yml up -d
+```
+
+### Production Deployment
+
+1. **Environment Configuration**
+```bash
+# Copy template
+copy .env.production.template .env.production
+
+# Edit with your production settings
+notepad .env.production
+```
+
+2. **Setup Data Directories**
 
 **Windows (PowerShell)**:
 ```powershell
@@ -47,18 +106,55 @@ mkdir -p production-data/{RedisData,MongoDB,logs,nginx,ssl}
 chmod -R 755 production-data/
 ```
 
-### 3. Deploy Application
+3. **Deploy Production Environment**
 
+**Windows PowerShell**:
+```powershell
+.\deploy-prod.ps1
+```
+
+**Manual Deployment**:
 ```bash
-# Start all services
+# Pull latest images and start services
+docker-compose -f docker-compose.prod.yml pull
 docker-compose -f docker-compose.prod.yml up -d
 
 # Check status
 docker-compose -f docker-compose.prod.yml ps
 
 # View logs
-docker-compose -f docker-compose.prod.yml logs -f app
+docker-compose -f docker-compose.prod.yml logs -f web
 ```
+
+## 🛠️ Deployment Scripts
+
+### Development Script (`deploy-dev.ps1`)
+```powershell
+# Deploy development environment
+.\deploy-dev.ps1
+
+# Other commands
+.\deploy-dev.ps1 stop      # Stop all services
+.\deploy-dev.ps1 logs      # View logs
+.\deploy-dev.ps1 status    # Check status
+.\deploy-dev.ps1 help      # Show help
+```
+
+### Production Script (`deploy-prod.ps1`)
+```powershell
+# Deploy production environment
+.\deploy-prod.ps1
+
+# Other commands
+.\deploy-prod.ps1 stop      # Stop all services
+.\deploy-prod.ps1 logs      # View logs
+.\deploy-prod.ps1 status    # Check status
+.\deploy-prod.ps1 help      # Show help
+```
+
+### Key Differences
+- **Development**: Builds images locally, enables hot reload, debug mode
+- **Production**: Uses pre-built Docker Hub images, optimized for performance
 
 ## ⚙️ Configuration Details
 
@@ -95,6 +191,45 @@ REDIS_DATA_PATH=${DATA_ROOT_PATH}/RedisData
 MONGODB_DATA_PATH=${DATA_ROOT_PATH}/MongoDB
 APP_LOGS_PATH=${DATA_ROOT_PATH}/logs
 ```
+
+## 📦 Docker Images
+
+### Development Image (Local Build)
+- **Source**: Built from local Dockerfile
+- **Purpose**: Development with live code changes
+- **Features**:
+  - Source code mounted as volumes
+  - Hot reload enabled
+  - Debug mode active
+  - Development environment variables
+
+### Production Image (Docker Hub)
+- **Repository**: `kmtempe/solemn-declaration:latest`
+- **Source**: Pre-built and published to Docker Hub
+- **Purpose**: Production deployment
+- **Features**:
+  - Optimized and secure
+  - No source code mounting
+  - Production environment variables
+  - Multi-stage build for smaller size
+
+### Image Configuration
+
+#### Base Image Features
+- **Base**: `python:3.12-alpine3.20`
+- **Security**: Non-root user (appuser)
+- **Health Checks**: Built-in health monitoring
+- **Optimization**: Minimal dependencies, cached layers
+- **Logging**: Structured logging to `/app/logs`
+
+#### Environment Differences
+| Feature | Development | Production |
+|---------|-------------|------------|
+| Image Source | Local build | Docker Hub |
+| Code Mounting | Yes (hot reload) | No |
+| Debug Mode | Enabled | Disabled |
+| SSL/TLS | Optional | Recommended |
+| Resource Limits | Relaxed | Strict |
 
 ## 🏗️ Docker Services
 

@@ -1,18 +1,22 @@
 services:
   web:
-    image: kmtempe/solemn-declaration:latest
-    container_name: L7SubmitForm_Prod
+    build: .
+    container_name: L7SubmitForm_Dev
     ports:
       - "5000:5000"
     environment:
-      - FLASK_ENV=production
-      - FLASK_DEBUG=0
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
       - PYTHONUNBUFFERED=1
       - PYTHONDONTWRITEBYTECODE=1
     env_file:
       - .env.production
     volumes:
       - ${APP_LOGS_PATH:-./production-data/logs}:/app/logs
+      # Mount source code for development (hot reload)
+      - ./app.py:/app/app.py
+      - ./templates:/app/templates
+      - ./static:/app/static
     depends_on:
       redis:
         condition: service_healthy
@@ -38,7 +42,7 @@ services:
 
   redis:
     image: redis:alpine
-    container_name: L7Redis_Prod
+    container_name: L7Redis_Dev
     restart: unless-stopped
     env_file:
       - .env.production
@@ -62,7 +66,7 @@ services:
 
   mongodb:
     image: mongo:7.0
-    container_name: L7MongoDB_Prod
+    container_name: L7MongoDB_Dev
     restart: unless-stopped
     env_file:
       - .env.production
@@ -91,7 +95,7 @@ services:
   # Optional: Nginx reverse proxy for SSL termination
   nginx:
     image: nginx:alpine
-    container_name: L7Nginx_Prod
+    container_name: L7Nginx_Dev
     ports:
       - "443:443"
     volumes:

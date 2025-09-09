@@ -20,11 +20,17 @@ try {
 # Validate Dockerfile syntax
 Write-Host ""
 Write-Host "2. Validating Dockerfile..." -ForegroundColor Yellow
-$buildResult = docker build -t l7-validation-test . 2>&1
+Write-Host "   Building Docker image (this may take a few minutes)..." -ForegroundColor Gray
+
+# Run docker build with live output
+docker build -t l7-validation-test .
 if ($LASTEXITCODE -eq 0) {
+    Write-Host ""
     Write-Host "[OK] Dockerfile builds successfully" -ForegroundColor Green
 } else {
+    Write-Host ""
     Write-Host "[ERROR] Dockerfile build failed" -ForegroundColor Red
+    Write-Host "   Check the build output above for details" -ForegroundColor Yellow
     exit 1
 }
 
@@ -32,36 +38,57 @@ if ($LASTEXITCODE -eq 0) {
 Write-Host ""
 Write-Host "3. Checking dependencies in Docker image..." -ForegroundColor Yellow
 
-$checkScript = @'
-try:
-    import flask
-    print("[OK] Flask")
-    import redis
-    print("[OK] redis")
-    import pymongo
-    print("[OK] pymongo")
-    import gunicorn
-    print("[OK] gunicorn")
-    import flask_session
-    print("[OK] flask_session")
-    import mobile_validate
-    print("[OK] mobile_validate")
-    print("All dependencies available!")
-except Exception as e:
-    print("[ERROR] Missing dependency: " + str(e))
-'@
+$pythonScript = 'import sys; deps = ["flask", "redis", "pymongo", "gunicorn", "flask_session", "mobile_validate", "bcrypt", "dotenv"]; names = ["Flask", "redis", "pymongo", "gunicorn", "flask_session", "mobile_validate", "bcrypt", "python-dotenv"]; failed = []; [failed.append(names[i]) if __import__(deps[i]) is None else print("[OK] " + names[i]) for i in range(len(deps)) if not (lambda: exec("import " + deps[i]) or True)()]; print("[SUCCESS] All dependencies available!") if not failed else (print("[FAILED] Missing: " + ", ".join(failed)) or sys.exit(1))'
 
-$depsCheck = docker run --rm l7-validation-test python -c $checkScript
-Write-Host $depsCheck
+# Simpler approach - test each dependency individually
+$dependencies = @(
+    @{module="flask"; name="Flask"},
+    @{module="redis"; name="redis"},
+    @{module="pymongo"; name="pymongo"},
+    @{module="gunicorn"; name="gunicorn"},
+    @{module="flask_session"; name="flask_session"},
+    @{module="mobile_validate"; name="mobile_validate"},
+    @{module="bcrypt"; name="bcrypt"},
+    @{module="dotenv"; name="python-dotenv"}
+)
+
+$allDepsOk = $true
+foreach ($dep in $dependencies) {
+    $testResult = docker run --rm l7-validation-test python -c "import $($dep.module); print('OK')" 2>$null
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "  [OK] $($dep.name)" -ForegroundColor Green
+    } else {
+        Write-Host "  [ERROR] $($dep.name) - MISSING" -ForegroundColor Red
+        $allDepsOk = $false
+    }
+}
+
+if ($allDepsOk) {
+    Write-Host "[SUCCESS] All critical dependencies available!" -ForegroundColor Green
+} else {
+    Write-Host "[ERROR] Some dependencies are missing" -ForegroundColor Red
+    exit 1
+}
 
 # Test that the app exists
 Write-Host ""
 Write-Host "4. Testing app structure..." -ForegroundColor Yellow
 
-if (Test-Path "app.py") {
-    Write-Host "[OK] app.py exists" -ForegroundColor Green
-} else {
-    Write-Host "[ERROR] app.py missing" -ForegroundColor Red
+$requiredFiles = @("app.py", "mongo_helper.py", "redis_helper.py", "redis_session_simple.py", "requirements.txt")
+$allFilesExist = $true
+
+foreach ($file in $requiredFiles) {
+    if (Test-Path $file) {
+        Write-Host "  [OK] $file exists" -ForegroundColor Green
+    } else {
+        Write-Host "  [ERROR] $file missing" -ForegroundColor Red
+        $allFilesExist = $false
+    }
+}
+
+if (-not $allFilesExist) {
+    Write-Host "[ERROR] Critical files missing" -ForegroundColor Red
+    exit 1
 }
 
 # Validate production compose file
@@ -104,6 +131,19 @@ if (Test-Path ".env.production") {
     Write-Host "   Copy from .env.production.template" -ForegroundColor White
 }
 
+# Check documentation structure
+Write-Host ""
+Write-Host "7. Checking documentation..." -ForegroundColor Yellow
+
+$docFiles = @("README.md", "Docker-Setup.md")
+foreach ($doc in $docFiles) {
+    if (Test-Path $doc) {
+        Write-Host "  [OK] $doc exists" -ForegroundColor Green
+    } else {
+        Write-Host "  [MISSING] $doc" -ForegroundColor Red
+    }
+}
+
 # Clean up test image
 docker rmi l7-validation-test 2>$null | Out-Null
 
@@ -111,5 +151,7 @@ Write-Host ""
 Write-Host "Validation complete!" -ForegroundColor Green
 Write-Host ""
 Write-Host "Next steps:" -ForegroundColor Yellow
-Write-Host "  - Run: .\deploy-prod.sh deploy" -ForegroundColor White
-Write-Host "  - Monitor: http://localhost/health" -ForegroundColor White
+Write-Host "  - Deploy: .\deploy-prod.ps1 deploy" -ForegroundColor White
+Write-Host "  - Monitor: http://localhost:5000/health" -ForegroundColor White
+Write-Host "  - Admin: http://localhost:5000/admin" -ForegroundColor White
+Write-Host "  - Documentation: See README.md and Docker-Setup.md" -ForegroundColor White

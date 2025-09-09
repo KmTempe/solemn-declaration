@@ -14,6 +14,7 @@ from mobile_validate.validator import valid_number
 from redis_helper import redis_helper, cache_result, rate_limit, track_metric
 from functools import wraps
 import bcrypt
+from typing import Optional, Dict, Any, Tuple
 
 try:
     from mongo_helper import mongo_helper, migrate_json_to_mongo
@@ -55,7 +56,7 @@ def get_or_create_admin_hash():
             print(f"✅ Generated and stored admin password hash in Redis")
         
         # Also try to store in MongoDB if available
-        if MONGO_AVAILABLE and mongo_helper and mongo_helper.is_available():
+        if MONGO_AVAILABLE and mongo_helper and mongo_helper.is_available() and mongo_helper.db is not None:
             try:
                 mongo_helper.db.admin_config.update_one(
                     {"type": "admin_auth"},
@@ -109,7 +110,7 @@ TRACKING_FILE = "submissions_tracking.json"
 def get_next_submission_id():
     """Generate next submission ID using MongoDB or JSON fallback"""
     try:
-        if MONGO_AVAILABLE and mongo_helper and mongo_helper.is_available():
+        if MONGO_AVAILABLE and mongo_helper and mongo_helper.is_available() and mongo_helper.db is not None:
             # Use MongoDB to get next ID
             last_submission = mongo_helper.db.submissions.find_one(
                 {}, 
@@ -881,7 +882,7 @@ def admin_password_info():
         if stored_hash:
             info["hash_stored_in"].append("Redis")
     
-    if MONGO_AVAILABLE and mongo_helper and mongo_helper.is_available():
+    if MONGO_AVAILABLE and mongo_helper and mongo_helper.is_available() and mongo_helper.db is not None:
         try:
             stored = mongo_helper.db.admin_config.find_one({"type": "admin_auth"})
             if stored and stored.get("password_hash"):
@@ -911,7 +912,7 @@ def admin_regenerate_hash():
         redis_helper.set("admin:password_hash", new_hash, ex=86400*30)
     
     # Store in MongoDB
-    if MONGO_AVAILABLE and mongo_helper and mongo_helper.is_available():
+    if MONGO_AVAILABLE and mongo_helper and mongo_helper.is_available() and mongo_helper.db is not None:
         try:
             mongo_helper.db.admin_config.update_one(
                 {"type": "admin_auth"},

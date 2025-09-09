@@ -1,5 +1,5 @@
-# Use Alpine as base for smaller image size
-FROM python:3.11-alpine3.18
+# Use Alpine as base for smaller image size - Updated to latest LTS version
+FROM python:3.12-alpine3.20
 
 # Set working directory
 WORKDIR /app
