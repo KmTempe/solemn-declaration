@@ -1,0 +1,185 @@
+<!-- templates/index.html -->
+<!doctype html>
+<html lang="el">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Αιτημα Επικοινωνιας</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <main class="container">
+    <header class="card header">
+      <h1>Αιτημα Επικοινωνιας</h1>
+    </header>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="messages">
+        {% for category, msg in messages %}
+          <div class="alert {{ category }}">{{ msg }}</div>
+        {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    {% if step == "otp" %}
+      <!-- OTP Verification Step -->
+      <div class="card form">
+        <h2>Επαλήθευση Email</h2>
+        <p>Στείλαμε έναν κωδικό επαλήθευσης 6 ψηφίων στο <strong>{{ email }}</strong>.</p>
+        <p>Παρακαλώ εισάγετε τον κωδικό παρακάτω για να ολοκληρώσετε την υποβολή της φόρμας σας:</p>
+        
+        <form method="post">
+          <input type="hidden" name="step" value="otp">
+          <input type="hidden" name="email" value="{{ email }}">
+          
+          <label>Κωδικός Επαλήθευσης (6 ψηφία)
+            <input type="text" name="otp" maxlength="6" pattern="[0-9]{6}" 
+                   placeholder="123456" required autofocus 
+                   style="text-align: center; font-size: 1.2em; letter-spacing: 0.2em;"
+                   autocomplete="one-time-code">
+          </label>
+          
+          <div class="actions">
+            <button type="submit" class="btn primary">Επαλήθευση</button>
+          </div>
+        </form>
+        
+        <div style="margin-top: 20px; text-align: center;">
+          <p>Δεν λάβατε τον κωδικό;</p>
+          <form method="post" action="{{ url_for('resend_otp') }}" style="display: inline;" id="resendForm">
+            <input type="hidden" name="email" value="{{ email }}">
+            <button type="submit" class="btn" id="resendBtn" style="background: none; border: 1px solid #ccc; padding: 8px 16px;">
+              Αποστολή νέου κωδικού
+            </button>
+          </form>
+          <div id="cooldownMessage" style="display: none; color: #666; font-size: 0.9em; margin-top: 10px;">
+            Παρακαλώ περιμένετε <span id="countdown">30</span> δευτερόλεπτα πριν ζητήσετε νέο κωδικό.
+          </div>
+        </div>
+        
+        <p class="muted small" style="margin-top: 20px;">
+          <strong>Σημείωση:</strong> Ο κωδικός είναι έγκυρος για 5 λεπτά μόνο.
+          Μπορείτε να κάνετε έως 3 προσπάθειες.
+        </p>
+        
+        <script>
+          // Handle resend cooldown on client side for better UX
+          let cooldownActive = false;
+          
+          document.getElementById('resendForm').addEventListener('submit', function(e) {
+            if (cooldownActive) {
+              e.preventDefault();
+              return;
+            }
+            
+            // Start cooldown after form submission
+            setTimeout(() => {
+              startCooldown();
+            }, 100);
+          });
+          
+          function startCooldown() {
+            cooldownActive = true;
+            const resendBtn = document.getElementById('resendBtn');
+            const cooldownMsg = document.getElementById('cooldownMessage');
+            const countdown = document.getElementById('countdown');
+            
+            resendBtn.disabled = true;
+            resendBtn.style.opacity = '0.5';
+            cooldownMsg.style.display = 'block';
+            
+            let timeLeft = 30;
+            countdown.textContent = timeLeft;
+            
+            const timer = setInterval(() => {
+              timeLeft--;
+              countdown.textContent = timeLeft;
+              
+              if (timeLeft <= 0) {
+                clearInterval(timer);
+                cooldownActive = false;
+                resendBtn.disabled = false;
+                resendBtn.style.opacity = '1';
+                cooldownMsg.style.display = 'none';
+              }
+            }, 1000);
+          }
+          
+          // Auto-format OTP input
+          document.querySelector('input[name="otp"]').addEventListener('input', function(e) {
+            this.value = this.value.replace(/[^0-9]/g, '');
+          });
+        </script>
+      </div>
+    {% else %}
+      <!-- Original Form Step -->
+      <form method="post" class="card form">
+        <!-- Honeypot: hidden field to catch bots -->
+        <input type="text" name="url_field" tabindex="-1" class="hidden" autocomplete="off">
+        <input type="hidden" name="step" value="form">
+
+        <div class="flex-row">
+          <label>Ονομα (First name)
+            <input name="first_name" value="{{ form.get('first_name','') }}" required>
+          </label>
+          <label>Επώνυμο (Last name)
+            <input name="last_name" value="{{ form.get('last_name','') }}" required>
+          </label>
+        </div>
+
+        <div class="flex-row">
+          <label>Τηλ. (Phone)
+            <input name="phone" value="{{ form.get('phone','') }}">
+          </label>
+          <label>Δ/νση Ηλεκτρ. Ταχυδρομείου (Email)
+            <input type="email" required name="email" value="{{ form.get('email','') }}">
+          </label>
+        </div>
+
+        <label>Comments (Περιγραφή)
+          <textarea name="comments" rows="8" required maxlength="500" oninput="updateCharCount(this)">{{ form.get('comments','') }}</textarea>
+          <small id="charCount">0/500</small>
+        </label>
+
+        <script>
+          function updateCharCount(textarea) {
+            const charCount = textarea.value.length;
+            const maxLength = textarea.getAttribute('maxlength');
+            document.getElementById('charCount').textContent = `${charCount}/${maxLength}`;
+          }
+          
+          // Initialize character count on page load
+          document.addEventListener('DOMContentLoaded', function() {
+            const textarea = document.querySelector('textarea[name="comments"]');
+            if (textarea) {
+              updateCharCount(textarea);
+            }
+          });
+        </script>
+
+        <div class="actions">
+          <button type="submit" class="btn primary">Αποστολή / Send</button>
+          <button type="reset" class="btn">Εκκαθάριση / Clear</button>
+        </div>
+
+        <p class="muted small">
+          Η δήλωση θα σταλεί στο <strong>{{ config.RECIPIENT_EMAIL or ('level7feeders@gmail.com') }}</strong>
+          μετά την επαλήθευση του email σας.
+        </p>
+        
+        <div class="alert info" style="margin-top: 15px; font-size: 0.9em;">
+          <strong>Νέο:</strong> Για την προστασία από spam, θα στείλουμε έναν κωδικό επαλήθευσης 
+          στο email σας πριν από την υποβολή της φόρμας.
+        </div>
+      </form>
+    {% endif %}
+
+    <footer class="muted footer">
+      <small>Level 7 Feeders Support</small> <br>
+      <small>V1.2.1</small>
+    </footer>
+  </main>
+</body>
+</html>

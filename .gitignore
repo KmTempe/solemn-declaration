@@ -1,0 +1,145 @@
+# Production-Only Git Repository
+# This repository contains only production-ready code
+
+# ================================
+# EXCLUDE DEVELOPMENT FILES
+# ================================
+
+# Development environment files
+.env
+.env.example
+docker-compose.yml
+start.py
+
+# Development and testing files
+test_*.py
+quick_*.py
+migrate_*.py
+*_implementation.py
+*_fix.py
+publish-docker.ps1
+
+# Development documentation
+REDIS_*.md
+*_NOTES.md
+*_SUCCESS.md
+
+# Development directories
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Development data and logs
+submissions/
+submissions_tracking.json/
+production-data/
+logs/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ================================
+# EXCLUDE SENSITIVE DATA
+# ================================
+
+# Environment files with secrets
+.env.production
+*.env
+
+# SSL certificates and keys
+*.pem
+*.key
+*.crt
+*.cert
+ssl/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# ================================
+# TEMPORARY AND CACHE FILES
+# ================================
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Pytest cache
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Docker
+.dockerignore
+
+# Node modules (if any)
+node_modules/
+npm-debug.log*
+
+# ================================
+# INCLUDE PRODUCTION FILES ONLY
+# ================================
+# The following files will be included:
+# - app.py (main application)
+# - requirements.txt (dependencies)
+# - Dockerfile (container definition)
+# - docker-compose.prod.yml (production orchestration)
+# - templates/ (HTML templates)
+# - static/ (CSS, JS, images)
+# - mongo_helper.py (database helper)
+# - redis_session_simple.py (session management)
+# - .env.production.template (configuration template)
+# - deploy-prod.sh (deployment script)
+# - setup-production-dirs.ps1 (setup script)
+# - validate-docker.ps1 (validation script)
+# - README-PRODUCTION.md (production documentation)
+# - PRODUCTION-STORAGE.md (storage documentation)
+# - mongo-init/ (database initialization)
+
+
+DOCKER-HUB-DEPLOYMENT.md
+GITHUB-PACKAGES-GUIDE.md
+GITHUB-QUICK-START.md
+publish-github-packages.ps1
+DOCKER-PUBLISH-SUCCESS.md
+RELEASE-NOTES.md
+
+GITHUB-ACTIONS-TROUBLESHOOTING.md
