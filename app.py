@@ -12,6 +12,8 @@ import smtplib
 from dotenv import load_dotenv
 from mobile_validate.validator import valid_number
 from redis_helper import redis_helper, cache_result, rate_limit, track_metric
+from functools import wraps
+import hashlib
 
 try:
     from mongo_helper import mongo_helper, migrate_json_to_mongo
@@ -23,6 +25,41 @@ except ImportError:
 
 # Load .env if present
 load_dotenv()
+
+# Admin credentials (from environment or default)
+ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "admin")
+ADMIN_PASSWORD_HASH = os.environ.get("ADMIN_PASSWORD_HASH")  # Should be SHA256 hash
+
+# If no hash provided, create one for default password "admin123"
+if not ADMIN_PASSWORD_HASH:
+    ADMIN_PASSWORD_HASH = hashlib.sha256("admin123".encode()).hexdigest()
+    print("⚠️  WARNING: Using default admin password. Set ADMIN_PASSWORD_HASH in production!")
+
+def require_admin_auth(f):
+    """Decorator to require admin authentication for sensitive routes"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # Check if user is authenticated
+        if not session.get('admin_authenticated'):
+            # Check for basic auth header
+            auth = request.authorization
+            if auth and auth.username == ADMIN_USERNAME and auth.password:
+                # Verify password hash
+                password_hash = hashlib.sha256(auth.password.encode()).hexdigest()
+                if password_hash == ADMIN_PASSWORD_HASH:
+                    session['admin_authenticated'] = True
+                    track_metric('admin_login_success')
+                    return f(*args, **kwargs)
+            
+            track_metric('admin_login_failed')
+            # Return 401 with basic auth challenge
+            return jsonify({
+                "error": "Authentication required",
+                "message": "This endpoint requires admin authentication"
+            }), 401, {'WWW-Authenticate': 'Basic realm="Admin Area"'}
+        
+        return f(*args, **kwargs)
+    return decorated_function
 
 # Initialize tracking system
 TRACKING_FILE = "submissions_tracking.json"
@@ -606,6 +643,7 @@ def check_submission(submission_id):
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route("/submissions")
+@require_admin_auth
 def view_submissions():
     """Display recent submissions (admin view)"""
     try:
@@ -645,6 +683,7 @@ def view_submissions():
         return jsonify({"error": str(e)}), 500
 
 @app.route("/metrics")
+@require_admin_auth
 def metrics():
     """Display application metrics (basic version)"""
     if not redis_helper.is_available():
@@ -774,6 +813,14 @@ def health_check():
     # Return appropriate HTTP status code
     status_code = 200 if overall_healthy else 503
     return jsonify(health_status), status_code
+
+@app.route("/admin/logout")
+@require_admin_auth 
+def admin_logout():
+    """Admin logout endpoint"""
+    session.pop('admin_authenticated', None)
+    track_metric('admin_logout')
+    return jsonify({"message": "Logged out successfully"})
 
 if __name__ == "__main__":
     # For production, use gunicorn or another WSGI server.

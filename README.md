@@ -165,7 +165,7 @@ chmod -R 755 /data-path
 
 ## 🏷️ Version
 
-- **Application**: v2.0.0-production
+- **Application**: v2.0.1-production
 - **Python**: 3.11
 - **Flask**: 3.1.1
 - **MongoDB**: 7.0
