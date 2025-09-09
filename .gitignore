@@ -144,3 +144,5 @@ RELEASE-NOTES.md
 
 GITHUB-ACTIONS-TROUBLESHOOTING.md
 PRIVATE-REPOSITORY-SETUP.md
+.env.admin-test
+generate_password_hash.py
