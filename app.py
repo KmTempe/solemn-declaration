@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 from mobile_validate.validator import valid_number
 from redis_helper import redis_helper, cache_result, rate_limit, track_metric
 from functools import wraps
-import hashlib
+import bcrypt
 
 try:
     from mongo_helper import mongo_helper, migrate_json_to_mongo
@@ -26,14 +26,55 @@ except ImportError:
 # Load .env if present
 load_dotenv()
 
-# Admin credentials (from environment or default)
+# Admin credentials (from environment)
 ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "admin")
-ADMIN_PASSWORD_HASH = os.environ.get("ADMIN_PASSWORD_HASH")  # Should be SHA256 hash
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")  # Plain password from environment
+ADMIN_PASSWORD_HASH = os.environ.get("ADMIN_PASSWORD_HASH")  # Pre-generated hash (optional)
 
-# If no hash provided, create one for default password "admin123"
-if not ADMIN_PASSWORD_HASH:
-    ADMIN_PASSWORD_HASH = hashlib.sha256("admin123".encode()).hexdigest()
-    print("⚠️  WARNING: Using default admin password. Set ADMIN_PASSWORD_HASH in production!")
+def get_or_create_admin_hash():
+    """Get admin password hash from Redis/MongoDB or generate from plain password"""
+    
+    # If we have a pre-generated hash, use it
+    if ADMIN_PASSWORD_HASH:
+        return ADMIN_PASSWORD_HASH
+    
+    # If we have a plain password, generate and store hash
+    if ADMIN_PASSWORD:
+        # Try to get existing hash from Redis first
+        if redis_helper.is_available():
+            stored_hash = redis_helper.get("admin:password_hash")
+            if stored_hash:
+                return stored_hash.decode('utf-8') if isinstance(stored_hash, bytes) else stored_hash
+        
+        # Generate new hash and store it
+        password_hash = bcrypt.hashpw(ADMIN_PASSWORD.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        
+        # Store in Redis for future use
+        if redis_helper.is_available():
+            redis_helper.set("admin:password_hash", password_hash, ex=86400*30)  # 30 days
+            print(f"✅ Generated and stored admin password hash in Redis")
+        
+        # Also try to store in MongoDB if available
+        if MONGO_AVAILABLE and mongo_helper and mongo_helper.is_available():
+            try:
+                mongo_helper.db.admin_config.update_one(
+                    {"type": "admin_auth"},
+                    {"$set": {"password_hash": password_hash, "updated_at": datetime.utcnow()}},
+                    upsert=True
+                )
+                print(f"✅ Stored admin password hash in MongoDB")
+            except Exception as e:
+                print(f"⚠️ Could not store hash in MongoDB: {e}")
+        
+        return password_hash
+    
+    # Fallback to default password
+    default_hash = bcrypt.hashpw("admin123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    print("⚠️ WARNING: Using default admin password 'admin123'. Set ADMIN_PASSWORD in production!")
+    return default_hash
+
+# Get the admin password hash (generated from plain password if needed)
+CURRENT_ADMIN_HASH = get_or_create_admin_hash()
 
 def require_admin_auth(f):
     """Decorator to require admin authentication for sensitive routes"""
@@ -44,9 +85,10 @@ def require_admin_auth(f):
             # Check for basic auth header
             auth = request.authorization
             if auth and auth.username == ADMIN_USERNAME and auth.password:
-                # Verify password hash
-                password_hash = hashlib.sha256(auth.password.encode()).hexdigest()
-                if password_hash == ADMIN_PASSWORD_HASH:
+                # Verify password using bcrypt
+                password_bytes = auth.password.encode('utf-8')
+                hash_bytes = CURRENT_ADMIN_HASH.encode('utf-8')
+                if bcrypt.checkpw(password_bytes, hash_bytes):
                     session['admin_authenticated'] = True
                     track_metric('admin_login_success')
                     return f(*args, **kwargs)
@@ -821,6 +863,69 @@ def admin_logout():
     session.pop('admin_authenticated', None)
     track_metric('admin_logout')
     return jsonify({"message": "Logged out successfully"})
+
+@app.route("/admin/password-info")
+@require_admin_auth
+def admin_password_info():
+    """Display admin password configuration info"""
+    info = {
+        "username": ADMIN_USERNAME,
+        "password_source": "environment" if ADMIN_PASSWORD else "hash" if ADMIN_PASSWORD_HASH else "default",
+        "hash_stored_in": [],
+        "hash_preview": CURRENT_ADMIN_HASH[:20] + "..." if CURRENT_ADMIN_HASH else None
+    }
+    
+    # Check where hash is stored
+    if redis_helper.is_available():
+        stored_hash = redis_helper.get("admin:password_hash")
+        if stored_hash:
+            info["hash_stored_in"].append("Redis")
+    
+    if MONGO_AVAILABLE and mongo_helper and mongo_helper.is_available():
+        try:
+            stored = mongo_helper.db.admin_config.find_one({"type": "admin_auth"})
+            if stored and stored.get("password_hash"):
+                info["hash_stored_in"].append("MongoDB")
+        except:
+            pass
+    
+    return jsonify(info)
+
+@app.route("/admin/regenerate-hash", methods=["POST"])
+@require_admin_auth
+def admin_regenerate_hash():
+    """Regenerate admin password hash from current environment password"""
+    global CURRENT_ADMIN_HASH
+    
+    if not ADMIN_PASSWORD:
+        return jsonify({"error": "No ADMIN_PASSWORD set in environment"}), 400
+    
+    # Generate new hash
+    new_hash = bcrypt.hashpw(ADMIN_PASSWORD.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    
+    # Update stored hash
+    CURRENT_ADMIN_HASH = new_hash
+    
+    # Store in Redis
+    if redis_helper.is_available():
+        redis_helper.set("admin:password_hash", new_hash, ex=86400*30)
+    
+    # Store in MongoDB
+    if MONGO_AVAILABLE and mongo_helper and mongo_helper.is_available():
+        try:
+            mongo_helper.db.admin_config.update_one(
+                {"type": "admin_auth"},
+                {"$set": {"password_hash": new_hash, "updated_at": datetime.utcnow()}},
+                upsert=True
+            )
+        except Exception as e:
+            print(f"Could not update MongoDB: {e}")
+    
+    track_metric('admin_password_regenerated')
+    return jsonify({
+        "message": "Password hash regenerated successfully", 
+        "hash_preview": new_hash[:20] + "..."
+    })
 
 if __name__ == "__main__":
     # For production, use gunicorn or another WSGI server.

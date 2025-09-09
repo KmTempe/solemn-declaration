@@ -26,6 +26,10 @@ python-dotenv==1.0.1
 
 # Production WSGI server
 gunicorn==23.0.0
+
+# Secure password hashing
+bcrypt==4.2.0
+
 # System utilities
 packaging==24.2
 colorama==0.4.6
