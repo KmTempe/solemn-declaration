@@ -90,12 +90,6 @@ All configuration is managed through environment variables in `.env.production`:
 - Email: SMTP configuration for notifications
 - Storage: Data persistence paths
 
-## Admin Access
-
-- Username: Configured via `ADMIN_USERNAME`
-- Password: Set via `ADMIN_PASSWORD` (automatically hashed with bcrypt)
-- Dashboard: Available at `/admin` endpoint
-
 ## Health Monitoring
 
 - `/health` - Application health check endpoint
@@ -122,11 +116,11 @@ docker run -p 5000:5000 kmtempe/solemn-declaration:latest
 
 ## License
 
-This project is proprietary software developed for Level 7 Feeders.
+This project is open source software.
 
 ## Support
 
-For technical support: level7feeders@gmail.com
+For technical support: Configure RECIPIENT_EMAIL in your environment
 
 Version: 2.0.4
 Last Updated: September 2025

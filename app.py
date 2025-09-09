@@ -171,8 +171,10 @@ SMTP_PORT = int(os.environ.get("SMTP_PORT", 587))
 SMTP_USER = os.environ.get("SMTP_USER")  # your SMTP user (email)
 SMTP_PASS = os.environ.get("SMTP_PASS")  # your SMTP password or app password
 
-# Default recipient
-DEFAULT_RECIPIENT = os.environ.get("RECIPIENT_EMAIL", "level7feeders@gmail.com")
+# Default recipient - where all form submissions are sent
+# This is the email address that receives all solemn declaration submissions
+# Set RECIPIENT_EMAIL environment variable to override the default
+DEFAULT_RECIPIENT = os.environ.get("RECIPIENT_EMAIL", "admin@example.com")
 
 # OTP storage (fallback to in-memory if Redis unavailable)
 otp_storage = {}
@@ -321,7 +323,7 @@ def send_otp_email(email, otp):
     <p style="color: #666; font-size: 0.9em;">Αν δεν κάνατε αυτή την αίτηση, παρακαλώ αγνοήστε αυτό το email.</p>
     
     <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
-    <p style="color: #666; font-size: 0.8em;">Level 7 Feeders Support</p>
+    <p style="color: #666; font-size: 0.8em;">System Support</p>
 </body>
 </html>
 """
