@@ -114,9 +114,6 @@ docker run -p 5000:5000 kmtempe/solemn-declaration:latest
 - Environment-based secrets management
 - Authenticated database connections
 
-## License
-
-This project is open source software.
 
 ## Support
 
